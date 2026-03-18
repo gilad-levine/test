@@ -337,7 +337,7 @@ function findJotFormRecordById(groupId, tableId, apiKey) {
       var submission = submissions[i];
       var answers = submission.answers;
       for (var key in answers) {
-        if (answers[key].name === 'googleSheets' && answers[key].answer.toString() === groupId.toString()) {
+        if (answers[key].name === 'googleSheets' && answers[key].answer != null && answers[key].answer.toString() === groupId.toString()) {
           Logger.log('Found matching record ID: ' + submission.id);
           return {
             id: submission.id,
