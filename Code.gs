@@ -62,6 +62,11 @@ function handleUniqueId(sheet, row) {
 function handleJotFormSync(sheet, row, EVENT_NAME, JOTFORM_TABLE_ID, JOTFORM_API_KEY, SHORTIO_API_KEY, SHORTIO_DOMAIN) {
   // Get values from the edited row
   var groupId = sheet.getRange(row, 45).getValue(); // Column AS - unique ID
+  // If no ID exists yet, generate one now before syncing
+  if (!groupId || groupId.toString().trim() === '') {
+    handleUniqueId(sheet, row);
+    groupId = sheet.getRange(row, 45).getValue();
+  }
   var groupName = sheet.getRange(row, 1).getValue(); // Column A
   var exhibitorAvailable = sheet.getRange(row, 22).getValue(); // Column V
   var exhibitorProAvailable = sheet.getRange(row, 23).getValue(); // Column W
@@ -288,19 +293,25 @@ function associateContactToDeal(contactId, dealId) {
   Logger.log('Association response: ' + assocResponse.getContentText());
 }
 // Returns the JotForm question ID (field number) for a given field label, e.g. "Google Sheets ID"
+// Looks it up by scanning answers from existing submissions (avoids needing the /questions endpoint)
 function getJotFormFieldIdByName(fieldName, tableId, apiKey) {
-  var url = 'https://api.jotform.com/form/' + tableId + '/questions?apiKey=' + apiKey;
-  var response = UrlFetchApp.fetch(url, { 'muteHttpExceptions': true });
-  var data = JSON.parse(response.getContentText());
-  if (data.responseCode === 200 && data.content) {
-    for (var qid in data.content) {
-      if (data.content[qid].text === fieldName) {
-        Logger.log('Found field "' + fieldName + '" with ID: ' + qid);
-        return qid;
+  var url = 'https://api.jotform.com/form/' + tableId + '/submissions?apiKey=' + apiKey + '&limit=10';
+  try {
+    var response = UrlFetchApp.fetch(url, { 'muteHttpExceptions': true });
+    var data = JSON.parse(response.getContentText());
+    if (data.responseCode === 200 && data.content && data.content.length > 0) {
+      var answers = data.content[0].answers;
+      for (var key in answers) {
+        if (answers[key].name === fieldName) {
+          Logger.log('Found field "' + fieldName + '" with ID: ' + key);
+          return key;
+        }
       }
     }
+  } catch (e) {
+    Logger.log('Error looking up field ID for "' + fieldName + '": ' + e);
   }
-  Logger.log('Field "' + fieldName + '" not found in JotForm form');
+  Logger.log('Field "' + fieldName + '" not found in JotForm submissions');
   return null;
 }
 function findJotFormRecordById(groupId, tableId, apiKey) {
