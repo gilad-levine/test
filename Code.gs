@@ -323,7 +323,12 @@ function findJotFormRecordById(groupId, tableId, apiKey) {
   var url = 'https://api.jotform.com/form/' + tableId + '/submissions?apiKey=' + apiKey + '&limit=1000';
   Logger.log('Searching for Google Sheets ID: "' + groupId + '"');
   var response = UrlFetchApp.fetch(url, { 'muteHttpExceptions': true });
-  var data = JSON.parse(response.getContentText());
+  var responseText = response.getContentText();
+  if (responseText.trim().charAt(0) !== '{') {
+    Logger.log('JotForm submissions returned non-JSON (HTTP ' + response.getResponseCode() + '): ' + responseText.substring(0, 300));
+    return null;
+  }
+  var data = JSON.parse(responseText);
   if (data.responseCode === 200 && data.content) {
     var submissions = data.content;
     Logger.log('Found ' + submissions.length + ' total submissions to search');
