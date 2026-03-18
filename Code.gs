@@ -332,7 +332,7 @@ function findJotFormRecordById(groupId, tableId, apiKey) {
       var submission = submissions[i];
       var answers = submission.answers;
       for (var key in answers) {
-        if (answers[key].name === 'Google Sheets ID' && answers[key].answer.toString() === groupId.toString()) {
+        if (answers[key].name === 'googleSheets' && answers[key].answer.toString() === groupId.toString()) {
           Logger.log('Found matching record ID: ' + submission.id);
           return {
             id: submission.id,
@@ -370,8 +370,7 @@ function updateJotFormRecord(submissionId, exhibitorAvailable, exhibitorProAvail
 }
 function createJotFormRecord(groupId, groupName, eventName, exhibitorAvailable, exhibitorProAvailable, vipPartyAvailable, tableId, apiKey) {
   var url = 'https://api.jotform.com/form/' + tableId + '/submissions?apiKey=' + apiKey;
-  // Look up the field ID for "Google Sheets ID" dynamically
-  var googleSheetsIdFieldId = getJotFormFieldIdByName('Google Sheets ID', tableId, apiKey);
+  var googleSheetsIdFieldId = '28'; // QID for "Google Sheets ID" field (name: googleSheets)
   // IMPORTANT: Initialize Used fields to 0 when creating new records
   var payload = {
     'submission[21]': groupName,              // Group Name
