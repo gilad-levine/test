@@ -287,6 +287,22 @@ function associateContactToDeal(contactId, dealId) {
   var assocResponse = UrlFetchApp.fetch(url, options);
   Logger.log('Association response: ' + assocResponse.getContentText());
 }
+// Returns the JotForm question ID (field number) for a given field label, e.g. "Google Sheets ID"
+function getJotFormFieldIdByName(fieldName, tableId, apiKey) {
+  var url = 'https://api.jotform.com/form/' + tableId + '/questions?apiKey=' + apiKey;
+  var response = UrlFetchApp.fetch(url, { 'muteHttpExceptions': true });
+  var data = JSON.parse(response.getContentText());
+  if (data.responseCode === 200 && data.content) {
+    for (var qid in data.content) {
+      if (data.content[qid].text === fieldName) {
+        Logger.log('Found field "' + fieldName + '" with ID: ' + qid);
+        return qid;
+      }
+    }
+  }
+  Logger.log('Field "' + fieldName + '" not found in JotForm form');
+  return null;
+}
 function findJotFormRecordById(groupId, tableId, apiKey) {
   if (!groupId || groupId.toString().trim() === '') {
     Logger.log('No Group ID provided, skipping JotForm search');
@@ -294,27 +310,27 @@ function findJotFormRecordById(groupId, tableId, apiKey) {
   }
   // Add limit parameter to get more submissions (default is only 20)
   var url = 'https://api.jotform.com/form/' + tableId + '/submissions?apiKey=' + apiKey + '&limit=1000';
-  Logger.log('Searching for Group ID: "' + groupId + '"');
+  Logger.log('Searching for Google Sheets ID: "' + groupId + '"');
   var response = UrlFetchApp.fetch(url, { 'muteHttpExceptions': true });
   var data = JSON.parse(response.getContentText());
   if (data.responseCode === 200 && data.content) {
     var submissions = data.content;
     Logger.log('Found ' + submissions.length + ' total submissions to search');
-    // Search for matching record using Group ID (Field 25)
+    // Search by field name "Google Sheets ID" across all answers
     for (var i = 0; i < submissions.length; i++) {
       var submission = submissions[i];
       var answers = submission.answers;
-      // Field 25 = Group ID (spreadsheet unique ID from column AS)
-      var submissionGroupId = answers['25'] ? answers['25'].answer : '';
-      if (submissionGroupId.toString() === groupId.toString()) {
-        Logger.log('Found matching record ID: ' + submission.id);
-        return {
-          id: submission.id,
-          data: submission
-        };
+      for (var key in answers) {
+        if (answers[key].name === 'Google Sheets ID' && answers[key].answer.toString() === groupId.toString()) {
+          Logger.log('Found matching record ID: ' + submission.id);
+          return {
+            id: submission.id,
+            data: submission
+          };
+        }
       }
     }
-    Logger.log('No matching record found for Group ID "' + groupId + '"');
+    Logger.log('No matching record found for Google Sheets ID "' + groupId + '"');
   } else {
     Logger.log('JotForm API error: ' + JSON.stringify(data));
   }
@@ -343,9 +359,10 @@ function updateJotFormRecord(submissionId, exhibitorAvailable, exhibitorProAvail
 }
 function createJotFormRecord(groupId, groupName, eventName, exhibitorAvailable, exhibitorProAvailable, vipPartyAvailable, tableId, apiKey) {
   var url = 'https://api.jotform.com/form/' + tableId + '/submissions?apiKey=' + apiKey;
+  // Look up the field ID for "Google Sheets ID" dynamically
+  var googleSheetsIdFieldId = getJotFormFieldIdByName('Google Sheets ID', tableId, apiKey);
   // IMPORTANT: Initialize Used fields to 0 when creating new records
   var payload = {
-    'submission[25]': groupId,                // Group ID (spreadsheet unique ID from column AS)
     'submission[21]': groupName,              // Group Name
     'submission[10]': eventName,              // event
     'submission[13]': exhibitorAvailable,     // Exhibitor Available
@@ -355,6 +372,12 @@ function createJotFormRecord(groupId, groupName, eventName, exhibitorAvailable, 
     'submission[23]': vipPartyAvailable,      // VIP Party Available
     'submission[24]': '0'                     // VIP Party Used (initialize to 0)
   };
+  // Add Google Sheets ID to payload using the dynamically resolved field ID
+  if (googleSheetsIdFieldId) {
+    payload['submission[' + googleSheetsIdFieldId + ']'] = groupId; // Google Sheets ID
+  } else {
+    Logger.log('Warning: Could not find "Google Sheets ID" field in JotForm — ID will not be stored');
+  }
   Logger.log('Creating submission with payload: ' + JSON.stringify(payload));
   var options = {
     'method': 'post',
