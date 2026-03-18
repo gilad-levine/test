@@ -61,19 +61,20 @@ function handleUniqueId(sheet, row) {
 // Factor out JotForm logic for clarity
 function handleJotFormSync(sheet, row, EVENT_NAME, JOTFORM_TABLE_ID, JOTFORM_API_KEY, SHORTIO_API_KEY, SHORTIO_DOMAIN) {
   // Get values from the edited row
+  var groupId = sheet.getRange(row, 45).getValue(); // Column AS - unique ID
   var groupName = sheet.getRange(row, 1).getValue(); // Column A
   var exhibitorAvailable = sheet.getRange(row, 22).getValue(); // Column V
   var exhibitorProAvailable = sheet.getRange(row, 23).getValue(); // Column W
   var vipPartyAvailable = sheet.getRange(row, 24).getValue(); // Column X
-  // Search for existing record in JotForm Table
-  var existingRecord = findJotFormRecord(groupName, EVENT_NAME, JOTFORM_TABLE_ID, JOTFORM_API_KEY);
+  // Search for existing record in JotForm Table by ID (column AS)
+  var existingRecord = findJotFormRecordById(groupId, JOTFORM_TABLE_ID, JOTFORM_API_KEY);
   if (existingRecord) {
     // Update existing record (only updates Available fields, never touches Used fields)
     updateJotFormRecord(existingRecord.id, exhibitorAvailable, exhibitorProAvailable, vipPartyAvailable, JOTFORM_TABLE_ID, JOTFORM_API_KEY);
     Logger.log('Updated record ID: ' + existingRecord.id);
   } else {
     // Create new record (sets Used fields to 0 initially)
-    var result = createJotFormRecord(groupName, EVENT_NAME, exhibitorAvailable, exhibitorProAvailable, vipPartyAvailable, JOTFORM_TABLE_ID, JOTFORM_API_KEY);
+    var result = createJotFormRecord(groupId, groupName, EVENT_NAME, exhibitorAvailable, exhibitorProAvailable, vipPartyAvailable, JOTFORM_TABLE_ID, JOTFORM_API_KEY);
     if (result.responseCode === 200 && result.content && result.content.submissionID) {
       var submissionId = result.content.submissionID;
       Logger.log('Created new record with ID: ' + submissionId);
@@ -286,23 +287,26 @@ function associateContactToDeal(contactId, dealId) {
   var assocResponse = UrlFetchApp.fetch(url, options);
   Logger.log('Association response: ' + assocResponse.getContentText());
 }
-function findJotFormRecord(groupName, eventName, tableId, apiKey) {
+function findJotFormRecordById(groupId, tableId, apiKey) {
+  if (!groupId || groupId.toString().trim() === '') {
+    Logger.log('No Group ID provided, skipping JotForm search');
+    return null;
+  }
   // Add limit parameter to get more submissions (default is only 20)
   var url = 'https://api.jotform.com/form/' + tableId + '/submissions?apiKey=' + apiKey + '&limit=1000';
-  Logger.log('Searching for Group: "' + groupName + '" Event: "' + eventName + '"');
+  Logger.log('Searching for Group ID: "' + groupId + '"');
   var response = UrlFetchApp.fetch(url, { 'muteHttpExceptions': true });
   var data = JSON.parse(response.getContentText());
   if (data.responseCode === 200 && data.content) {
     var submissions = data.content;
     Logger.log('Found ' + submissions.length + ' total submissions to search');
-    // Search for matching record using field IDs
+    // Search for matching record using Group ID (Field 25)
     for (var i = 0; i < submissions.length; i++) {
       var submission = submissions[i];
       var answers = submission.answers;
-      // Field 21 = Group Name, Field 10 = event
-      var submissionGroupName = answers['21'] ? answers['21'].answer : '';
-      var submissionEventName = answers['10'] ? answers['10'].answer : '';
-      if (submissionGroupName === groupName && submissionEventName === eventName) {
+      // Field 25 = Group ID (spreadsheet unique ID from column AS)
+      var submissionGroupId = answers['25'] ? answers['25'].answer : '';
+      if (submissionGroupId.toString() === groupId.toString()) {
         Logger.log('Found matching record ID: ' + submission.id);
         return {
           id: submission.id,
@@ -310,7 +314,7 @@ function findJotFormRecord(groupName, eventName, tableId, apiKey) {
         };
       }
     }
-    Logger.log('No matching record found for "' + groupName + '"');
+    Logger.log('No matching record found for Group ID "' + groupId + '"');
   } else {
     Logger.log('JotForm API error: ' + JSON.stringify(data));
   }
@@ -337,10 +341,11 @@ function updateJotFormRecord(submissionId, exhibitorAvailable, exhibitorProAvail
   Logger.log('Update Response: ' + responseText);
   return JSON.parse(responseText);
 }
-function createJotFormRecord(groupName, eventName, exhibitorAvailable, exhibitorProAvailable, vipPartyAvailable, tableId, apiKey) {
+function createJotFormRecord(groupId, groupName, eventName, exhibitorAvailable, exhibitorProAvailable, vipPartyAvailable, tableId, apiKey) {
   var url = 'https://api.jotform.com/form/' + tableId + '/submissions?apiKey=' + apiKey;
   // IMPORTANT: Initialize Used fields to 0 when creating new records
   var payload = {
+    'submission[25]': groupId,                // Group ID (spreadsheet unique ID from column AS)
     'submission[21]': groupName,              // Group Name
     'submission[10]': eventName,              // event
     'submission[13]': exhibitorAvailable,     // Exhibitor Available
