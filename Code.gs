@@ -73,11 +73,21 @@ function handleJotFormSync(sheet, row, EVENT_NAME, JOTFORM_TABLE_ID, JOTFORM_API
   var vipPartyAvailable = sheet.getRange(row, 24).getValue(); // Column X
   // Search for existing record in JotForm Table by ID (column AS)
   var existingRecord = findJotFormRecordById(groupId, JOTFORM_TABLE_ID, JOTFORM_API_KEY);
+  if (existingRecord && existingRecord.fetchError) {
+    Logger.log('Aborting sync for row ' + row + ': could not read JotForm submissions (API error). Will not create duplicate.');
+    return;
+  }
   if (existingRecord) {
     // Update existing record (only updates Available fields, never touches Used fields)
     updateJotFormRecord(existingRecord.id, exhibitorAvailable, exhibitorProAvailable, vipPartyAvailable, JOTFORM_TABLE_ID, JOTFORM_API_KEY);
     Logger.log('Updated record ID: ' + existingRecord.id);
   } else {
+    // Safety guard: if column AP already has a short link, the record was already created
+    var existingShortLink = sheet.getRange(row, 42).getValue();
+    if (existingShortLink && existingShortLink.toString().trim() !== '') {
+      Logger.log('Column AP already has a link for row ' + row + ' — skipping creation to avoid duplicate.');
+      return;
+    }
     // Create new record (sets Used fields to 0 initially)
     var result = createJotFormRecord(groupId, groupName, EVENT_NAME, exhibitorAvailable, exhibitorProAvailable, vipPartyAvailable, JOTFORM_TABLE_ID, JOTFORM_API_KEY);
     if (result.responseCode === 200 && result.content && result.content.submissionID) {
@@ -326,7 +336,7 @@ function findJotFormRecordById(groupId, tableId, apiKey) {
   var responseText = response.getContentText();
   if (responseText.trim().charAt(0) !== '{') {
     Logger.log('JotForm submissions returned non-JSON (HTTP ' + response.getResponseCode() + '): ' + responseText.substring(0, 300));
-    return null;
+    return { fetchError: true };
   }
   var data = JSON.parse(responseText);
   if (data.responseCode === 200 && data.content) {
