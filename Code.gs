@@ -376,6 +376,10 @@ function updateJotFormRecord(submissionId, exhibitorAvailable, exhibitorProAvail
   var responseCode = response.getResponseCode();
   Logger.log('Update Response Code: ' + responseCode);
   Logger.log('Update Response: ' + responseText);
+  if (responseText.trim().charAt(0) !== '{') {
+    Logger.log('Update returned non-JSON (HTTP ' + responseCode + ') — likely an API key permissions issue');
+    return { responseCode: responseCode, error: 'non-JSON response' };
+  }
   return JSON.parse(responseText);
 }
 function createJotFormRecord(groupId, groupName, eventName, exhibitorAvailable, exhibitorProAvailable, vipPartyAvailable, tableId, apiKey) {
