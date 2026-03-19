@@ -329,18 +329,19 @@ function findJotFormRecordById(groupId, tableId, apiKey) {
     Logger.log('No Group ID provided, skipping JotForm search');
     return null;
   }
-  // Filter directly by field 28 (Google Sheets ID) — no need to fetch all submissions
-  var filter = encodeURIComponent(JSON.stringify({'28': groupId.toString()}));
-  var url = 'https://api.jotform.com/form/' + tableId + '/submissions?apiKey=' + apiKey + '&filter=' + filter;
   Logger.log('Searching for Google Sheets ID: "' + groupId + '"');
-  var response = UrlFetchApp.fetch(url, { 'muteHttpExceptions': true });
-  var responseText = response.getContentText();
-  if (responseText.trim().charAt(0) !== '{') {
-    Logger.log('JotForm submissions returned non-JSON (HTTP ' + response.getResponseCode() + '): ' + responseText.substring(0, 300));
-    return { fetchError: true };
-  }
-  var data = JSON.parse(responseText);
-  if (data.responseCode === 200 && data.content && data.content.length > 0) {
+  var offset = 0;
+  var limit = 100;
+  while (true) {
+    var url = 'https://api.jotform.com/form/' + tableId + '/submissions?apiKey=' + apiKey + '&limit=' + limit + '&offset=' + offset;
+    var response = UrlFetchApp.fetch(url, { 'muteHttpExceptions': true });
+    var responseText = response.getContentText();
+    if (responseText.trim().charAt(0) !== '{') {
+      Logger.log('JotForm submissions returned non-JSON (HTTP ' + response.getResponseCode() + '): ' + responseText.substring(0, 300));
+      return { fetchError: true };
+    }
+    var data = JSON.parse(responseText);
+    if (data.responseCode !== 200 || !data.content || data.content.length === 0) break;
     for (var i = 0; i < data.content.length; i++) {
       var submission = data.content[i];
       var answers = submission.answers;
@@ -350,7 +351,8 @@ function findJotFormRecordById(groupId, tableId, apiKey) {
         return { id: submission.id, data: submission };
       }
     }
-    Logger.log('JotForm returned results but none matched Google Sheets ID "' + groupId + '" — filter may be unreliable');
+    if (data.content.length < limit) break;
+    offset += limit;
   }
   Logger.log('No matching record found for Google Sheets ID "' + groupId + '"');
   return null;
