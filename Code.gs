@@ -110,8 +110,9 @@ function handleJotFormSync(sheet, row, EVENT_NAME, JOTFORM_TABLE_ID, JOTFORM_API
     }
     // Create new record (sets Used fields to 0 initially)
     var result = createJotFormRecord(groupId, groupName, EVENT_NAME, exhibitorAvailable, exhibitorProAvailable, vipPartyAvailable, JOTFORM_TABLE_ID, JOTFORM_API_KEY);
-    if (result.responseCode === 200 && result.content) {
-      var submissionId = result.content.toString();
+    Logger.log('Create response content: ' + JSON.stringify(result.content));
+    if (result.responseCode === 200 && result.content && result.content.submissionID) {
+      var submissionId = result.content.submissionID;
       Logger.log('Created new record with ID: ' + submissionId);
       sheet.getRange(row, 45).setValue(submissionId); // Overwrite group ID with submission ID
       // Create short link
