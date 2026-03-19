@@ -341,9 +341,16 @@ function findJotFormRecordById(groupId, tableId, apiKey) {
   }
   var data = JSON.parse(responseText);
   if (data.responseCode === 200 && data.content && data.content.length > 0) {
-    var submission = data.content[0];
-    Logger.log('Found matching record ID: ' + submission.id);
-    return { id: submission.id, data: submission };
+    for (var i = 0; i < data.content.length; i++) {
+      var submission = data.content[i];
+      var answers = submission.answers;
+      if (answers && answers['28'] && answers['28'].answer !== undefined &&
+          answers['28'].answer.toString() === groupId.toString()) {
+        Logger.log('Found matching record ID: ' + submission.id);
+        return { id: submission.id, data: submission };
+      }
+    }
+    Logger.log('JotForm returned results but none matched Google Sheets ID "' + groupId + '" — filter may be unreliable');
   }
   Logger.log('No matching record found for Google Sheets ID "' + groupId + '"');
   return null;
