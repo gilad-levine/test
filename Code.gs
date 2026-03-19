@@ -71,16 +71,34 @@ function handleJotFormSync(sheet, row, EVENT_NAME, JOTFORM_TABLE_ID, JOTFORM_API
   var exhibitorAvailable = sheet.getRange(row, 22).getValue(); // Column V
   var exhibitorProAvailable = sheet.getRange(row, 23).getValue(); // Column W
   var vipPartyAvailable = sheet.getRange(row, 24).getValue(); // Column X
-  // Search for existing record in JotForm Table by ID (column AS)
+
+  // Check column AT (46) for a stored JotForm submission ID from a previous creation
+  var storedSubmissionId = sheet.getRange(row, 46).getValue(); // Column AT
+  if (storedSubmissionId && storedSubmissionId.toString().trim() !== '') {
+    Logger.log('Using stored JotForm submission ID for row ' + row + ': ' + storedSubmissionId);
+    updateJotFormRecord(storedSubmissionId.toString().trim(), exhibitorAvailable, exhibitorProAvailable, vipPartyAvailable, JOTFORM_TABLE_ID, JOTFORM_API_KEY);
+    Logger.log('Updated record ID: ' + storedSubmissionId);
+    return;
+  }
+
+  // No stored ID — search JotForm for an existing record by group ID
   var existingRecord = findJotFormRecordById(groupId, JOTFORM_TABLE_ID, JOTFORM_API_KEY);
   if (existingRecord && existingRecord.fetchError) {
-    Logger.log('Could not read JotForm submissions for row ' + row + ' (API error). Will attempt creation if no short link exists.');
+    // API read failed; use short link as duplicate guard before attempting creation
+    var existingShortLink = sheet.getRange(row, 42).getValue();
+    if (existingShortLink && existingShortLink.toString().trim() !== '') {
+      Logger.log('JotForm API error but short link exists for row ' + row + ' — skipping to avoid duplicate.');
+      return;
+    }
+    Logger.log('JotForm API error for row ' + row + ' and no short link found — will attempt creation.');
     existingRecord = null;
   }
+
   if (existingRecord) {
-    // Update existing record (only updates Available fields, never touches Used fields)
+    // Found in JotForm — update and store the submission ID for future syncs
     updateJotFormRecord(existingRecord.id, exhibitorAvailable, exhibitorProAvailable, vipPartyAvailable, JOTFORM_TABLE_ID, JOTFORM_API_KEY);
-    Logger.log('Updated record ID: ' + existingRecord.id);
+    sheet.getRange(row, 46).setValue(existingRecord.id); // Store in column AT
+    Logger.log('Updated record ID: ' + existingRecord.id + ' (stored in column AT)');
   } else {
     // Safety guard: if column AP already has a short link, the record was already created
     var existingShortLink = sheet.getRange(row, 42).getValue();
@@ -93,6 +111,7 @@ function handleJotFormSync(sheet, row, EVENT_NAME, JOTFORM_TABLE_ID, JOTFORM_API
     if (result.responseCode === 200 && result.content && result.content.submissionID) {
       var submissionId = result.content.submissionID;
       Logger.log('Created new record with ID: ' + submissionId);
+      sheet.getRange(row, 46).setValue(submissionId); // Store in column AT for future syncs
       // Create short link
       var originalUrl = 'https://registration-router.resources-8c8.workers.dev/?grpid=' + groupId;
       var shortUrl = createShortLink(originalUrl, SHORTIO_API_KEY, SHORTIO_DOMAIN);
