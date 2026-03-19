@@ -74,8 +74,8 @@ function handleJotFormSync(sheet, row, EVENT_NAME, JOTFORM_TABLE_ID, JOTFORM_API
   // Search for existing record in JotForm Table by ID (column AS)
   var existingRecord = findJotFormRecordById(groupId, JOTFORM_TABLE_ID, JOTFORM_API_KEY);
   if (existingRecord && existingRecord.fetchError) {
-    Logger.log('Aborting sync for row ' + row + ': could not read JotForm submissions (API error). Will not create duplicate.');
-    return;
+    Logger.log('Could not read JotForm submissions for row ' + row + ' (API error). Will attempt creation if no short link exists.');
+    existingRecord = null;
   }
   if (existingRecord) {
     // Update existing record (only updates Available fields, never touches Used fields)
