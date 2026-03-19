@@ -329,8 +329,9 @@ function findJotFormRecordById(groupId, tableId, apiKey) {
     Logger.log('No Group ID provided, skipping JotForm search');
     return null;
   }
-  // Add limit parameter to get more submissions (default is only 20)
-  var url = 'https://api.jotform.com/form/' + tableId + '/submissions?apiKey=' + apiKey + '&limit=1000';
+  // Filter directly by field 28 (Google Sheets ID) — no need to fetch all submissions
+  var filter = encodeURIComponent(JSON.stringify({'28': groupId.toString()}));
+  var url = 'https://api.jotform.com/form/' + tableId + '/submissions?apiKey=' + apiKey + '&filter=' + filter;
   Logger.log('Searching for Google Sheets ID: "' + groupId + '"');
   var response = UrlFetchApp.fetch(url, { 'muteHttpExceptions': true });
   var responseText = response.getContentText();
@@ -339,29 +340,13 @@ function findJotFormRecordById(groupId, tableId, apiKey) {
     return { fetchError: true };
   }
   var data = JSON.parse(responseText);
-  if (data.responseCode === 200 && data.content) {
-    var submissions = data.content;
-    Logger.log('Found ' + submissions.length + ' total submissions to search');
-    var targetId = parseInt(groupId, 10);
-    for (var i = 0; i < submissions.length; i++) {
-      var submission = submissions[i];
-      var answers = submission.answers;
-      if (answers['28'] && answers['28'].answer != null) {
-        var answerVal = parseInt(answers['28'].answer, 10);
-        if (answerVal === targetId) {
-          Logger.log('Found matching record ID: ' + submission.id);
-          return {
-            id: submission.id,
-            data: submission
-          };
-        }
-      }
-    }
-    Logger.log('No matching record found for Google Sheets ID "' + groupId + '"');
-  } else {
-    Logger.log('JotForm API error: ' + JSON.stringify(data));
+  if (data.responseCode === 200 && data.content && data.content.length > 0) {
+    var submission = data.content[0];
+    Logger.log('Found matching record ID: ' + submission.id);
+    return { id: submission.id, data: submission };
   }
-  return null; // No match found
+  Logger.log('No matching record found for Google Sheets ID "' + groupId + '"');
+  return null;
 }
 function updateJotFormRecord(submissionId, exhibitorAvailable, exhibitorProAvailable, vipPartyAvailable, tableId, apiKey) {
   var url = 'https://api.jotform.com/submission/' + submissionId + '?apiKey=' + apiKey;
