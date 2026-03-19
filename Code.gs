@@ -105,7 +105,7 @@ function handleJotFormSync(sheet, row, EVENT_NAME, JOTFORM_TABLE_ID, JOTFORM_API
     // Safety guard: if column AP already has a short link, the record was already created
     var existingShortLink = sheet.getRange(row, 42).getValue();
     if (existingShortLink && existingShortLink.toString().trim() !== '') {
-      Logger.log('Column AP already has a link for row ' + row + ' — skipping creation to avoid duplicate.');
+      Logger.log('Row ' + row + ': JotForm record not found by search but short link exists in column AP — cannot update. Paste the JotForm submission ID into column AS to enable future updates.');
       return;
     }
     // Create new record (sets Used fields to 0 initially)
