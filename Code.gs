@@ -94,7 +94,7 @@ function handleJotFormSync(sheet, row, EVENT_NAME, JOTFORM_TABLE_ID, JOTFORM_API
       var submissionId = result.content.submissionID;
       Logger.log('Created new record with ID: ' + submissionId);
       // Create short link
-      var originalUrl = 'https://registration-router.resources-8c8.workers.dev/?grpid=' + submissionId;
+      var originalUrl = 'https://registration-router.resources-8c8.workers.dev/?grpid=' + groupId;
       var shortUrl = createShortLink(originalUrl, SHORTIO_API_KEY, SHORTIO_DOMAIN);
       if (shortUrl) {
         // Update column AP (column 42) with the short link
