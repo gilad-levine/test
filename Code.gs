@@ -342,27 +342,18 @@ function findJotFormRecordById(groupId, tableId, apiKey) {
   if (data.responseCode === 200 && data.content) {
     var submissions = data.content;
     Logger.log('Found ' + submissions.length + ' total submissions to search');
-    // Log the first submission's answers to help debug field names and value types
-    if (submissions.length > 0) {
-      var firstAnswers = submissions[0].answers;
-      for (var dbgKey in firstAnswers) {
-        Logger.log('Sample answer - name: "' + firstAnswers[dbgKey].name + '", answer: ' + JSON.stringify(firstAnswers[dbgKey].answer));
-      }
-    }
     var targetId = parseInt(groupId, 10);
     for (var i = 0; i < submissions.length; i++) {
       var submission = submissions[i];
       var answers = submission.answers;
-      for (var key in answers) {
-        if (answers[key].name === 'googleSheets' && answers[key].answer != null) {
-          var answerVal = parseInt(answers[key].answer, 10);
-          if (answerVal === targetId) {
-            Logger.log('Found matching record ID: ' + submission.id);
-            return {
-              id: submission.id,
-              data: submission
-            };
-          }
+      if (answers['28'] && answers['28'].answer != null) {
+        var answerVal = parseInt(answers['28'].answer, 10);
+        if (answerVal === targetId) {
+          Logger.log('Found matching record ID: ' + submission.id);
+          return {
+            id: submission.id,
+            data: submission
+          };
         }
       }
     }
